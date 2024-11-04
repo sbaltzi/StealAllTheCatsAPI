@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using StealAllTheCatsAPI.Models;
-using System.ComponentModel.DataAnnotations;
 
 namespace StealAllTheCatsAPI.Controllers;
 
@@ -10,10 +10,17 @@ namespace StealAllTheCatsAPI.Controllers;
 public class CatsController : ControllerBase
 {
     private readonly StealAlltheCatsDbContext _context;
+    private readonly HttpClient _httpClient;
+    private const string CatApiBaseUrl = "https://api.thecatapi.com/v1/";
+    private const string CatApiKey = "live_q2lU4Ud4QNYu7I6OyksD1mguJ4zL2kZOnJN6e7SBZPtm5nd5AKUeRVWyZRe0AViZ";
 
-    public CatsController(StealAlltheCatsDbContext context)
+    public CatsController(HttpClient httpClient, StealAlltheCatsDbContext context)
     {
         _context = context;
+
+        _httpClient = httpClient;
+        // Add your API key as a header if required
+        _httpClient.DefaultRequestHeaders.Add("x-api-key", CatApiKey);
     }
 
     // GET: api/cats/5
@@ -108,10 +115,24 @@ public class CatsController : ControllerBase
     public async Task<IActionResult> FetchCatEntities()
     {
         const int numberOfCatsToFetch = 25;
+        var response = await _httpClient.GetAsync($"{CatApiBaseUrl}images/search?limit={numberOfCatsToFetch}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return StatusCode((int)response.StatusCode, "Failed to fetch data from TheCatAPI.");
+        }
+
+        // Deserialize the JSON response into the model
+        var content = await response.Content.ReadAsStringAsync();
+        var cats = JsonConvert.DeserializeObject<List<Models.External.CatEntity>>(content);
+
         //_context.Cats.Add(catEntity);
         await _context.SaveChangesAsync();
 
-        return Ok($"{numberOfCatsToFetch} new cat images added.");
+        // Return the deserialized object (JSON) to the client
+        return Ok(cats);
+
+        // return Ok($"{numberOfCatsToFetch} new cat images added.");
     }
 
     // DELETE: api/cats/5
