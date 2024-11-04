@@ -9,18 +9,18 @@ namespace StealAllTheCatsAPI.Controllers;
 [ApiController]
 public class CatsController : ControllerBase
 {
+    private readonly string _catsApiKey;
     private readonly StealAlltheCatsDbContext _context;
     private readonly HttpClient _httpClient;
     private const string CatApiBaseUrl = "https://api.thecatapi.com/v1/";
-    private const string CatApiKey = "live_q2lU4Ud4QNYu7I6OyksD1mguJ4zL2kZOnJN6e7SBZPtm5nd5AKUeRVWyZRe0AViZ";
 
-    public CatsController(HttpClient httpClient, StealAlltheCatsDbContext context)
+    public CatsController(HttpClient httpClient, StealAlltheCatsDbContext context, IConfiguration configuration)
     {
-        _context = context;
-
+        _catsApiKey = configuration["APIKeys:CatsAsAService"];
         _httpClient = httpClient;
+        _context = context;
         // Add your API key as a header if required
-        _httpClient.DefaultRequestHeaders.Add("x-api-key", CatApiKey);
+        _httpClient.DefaultRequestHeaders.Add("x-api-key", _catsApiKey);
     }
 
     // GET: api/cats/5
