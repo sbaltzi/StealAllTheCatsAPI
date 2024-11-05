@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Razor.Language.Intermediate;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using StealAllTheCatsAPI.Models;
+using StealAllTheCatsAPI.Repositories;
 
 namespace StealAllTheCatsAPI.Controllers;
 
@@ -10,15 +12,15 @@ namespace StealAllTheCatsAPI.Controllers;
 public class CatsController : ControllerBase
 {
     private readonly string _catsApiKey;
-    private readonly StealAlltheCatsDbContext _context;
+    private readonly ICatRepository _catRepository;
     private readonly HttpClient _httpClient;
     private const string CatApiBaseUrl = "https://api.thecatapi.com/v1/";
 
-    public CatsController(HttpClient httpClient, StealAlltheCatsDbContext context, IConfiguration configuration)
+    public CatsController(HttpClient httpClient, ICatRepository catRepository, IConfiguration configuration)
     {
         _catsApiKey = configuration["APIKeys:CatsAsAService"];
         _httpClient = httpClient;
-        _context = context;
+        _catRepository = catRepository;
         // Add your API key as a header if required
         _httpClient.DefaultRequestHeaders.Add("x-api-key", _catsApiKey);
     }
@@ -27,7 +29,7 @@ public class CatsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<CatEntity>> GetCatEntity(int id)
     {
-        var catEntity = await _context.Cats.FindAsync(id);
+        var catEntity = await _catRepository.GetCat(id);
 
         if (catEntity == null)
         {
@@ -43,6 +45,8 @@ public class CatsController : ControllerBase
         [FromQuery] PaginationParameters pagination,
         [FromQuery] string? tag = null)
     {
+        int offset = (pagination.Page - 1) * pagination.PageSize;
+        int numCats = pagination.PageSize;
 
         if (!ModelState.IsValid)
         {
@@ -51,21 +55,11 @@ public class CatsController : ControllerBase
 
         if (string.IsNullOrEmpty(tag))
         {
-            var cats = await _context.Cats
-                .Skip((pagination.Page - 1) * pagination.PageSize)
-                .Take(pagination.PageSize)
-                .ToListAsync();
-
-            return cats;
+            var cats = await _catRepository.GetCats(offset, numCats);
+            return Ok(cats);
         }
 
-        var catsByTag = await _context.Cats
-            .Where(cat => cat.Tags.Any(t => t.Name == tag)) // Assuming TagEntity has a Name property
-            .Skip((pagination.Page - 1) * pagination.PageSize)
-            .Take(pagination.PageSize)
-            .ToListAsync();
-
-        return catsByTag;
+        return Ok(await _catRepository.GetCatsByTag(tag, offset, numCats));
     }
 
     // PUT: api/cats/5
@@ -78,24 +72,12 @@ public class CatsController : ControllerBase
             return BadRequest();
         }
 
-        _context.Entry(catEntity).State = EntityState.Modified;
+        var cat = await _catRepository.UpdateCat(catEntity);
 
-        try
+        if (cat == null)
         {
-            await _context.SaveChangesAsync();
+            return NotFound();
         }
-        catch (DbUpdateConcurrencyException)
-        {
-            if (!CatEntityExists(id))
-            {
-                return NotFound();
-            }
-            else
-            {
-                throw;
-            }
-        }
-
         return NoContent();
     }
 
@@ -104,10 +86,9 @@ public class CatsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<CatEntity>> PostCatEntity(CatEntity catEntity)
     {
-        _context.Cats.Add(catEntity);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction("GetCatEntity", new { id = catEntity.Id }, catEntity);
+        var cat = await _catRepository.AddCat(catEntity);
+    
+        return CreatedAtAction("GetCatEntity", new { id = cat.Id }, cat);
     }
 
     // POST: api/cats/fetch
@@ -127,7 +108,6 @@ public class CatsController : ControllerBase
         var cats = JsonConvert.DeserializeObject<List<Models.External.CatEntity>>(content);
 
         //_context.Cats.Add(catEntity);
-        await _context.SaveChangesAsync();
 
         // Return the deserialized object (JSON) to the client
         return Ok(cats);
@@ -139,20 +119,12 @@ public class CatsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteCatEntity(int id)
     {
-        var catEntity = await _context.Cats.FindAsync(id);
+        var catEntity = await _catRepository.DeleteCat(id);
         if (catEntity == null)
         {
             return NotFound();
         }
 
-        _context.Cats.Remove(catEntity);
-        await _context.SaveChangesAsync();
-
         return NoContent();
-    }
-
-    private bool CatEntityExists(int id)
-    {
-        return _context.Cats.Any(e => e.Id == id);
     }
 }
