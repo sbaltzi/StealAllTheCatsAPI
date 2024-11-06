@@ -1,9 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Razor.Language.Intermediate;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using StealAllTheCatsAPI.Models;
 using StealAllTheCatsAPI.Repositories;
+using StealAllTheCatsAPI.Services;
 
 namespace StealAllTheCatsAPI.Controllers;
 
@@ -11,18 +9,13 @@ namespace StealAllTheCatsAPI.Controllers;
 [ApiController]
 public class CatsController : ControllerBase
 {
-    private readonly string _catsApiKey;
     private readonly ICatRepository _catRepository;
-    private readonly HttpClient _httpClient;
-    private const string CatApiBaseUrl = "https://api.thecatapi.com/v1/";
+    private readonly ICatService _catService;
 
-    public CatsController(HttpClient httpClient, ICatRepository catRepository, IConfiguration configuration)
+    public CatsController(ICatService catService, ICatRepository catRepository)
     {
-        _catsApiKey = configuration["APIKeys:CatsAsAService"];
-        _httpClient = httpClient;
         _catRepository = catRepository;
-        // Add your API key as a header if required
-        _httpClient.DefaultRequestHeaders.Add("x-api-key", _catsApiKey);
+        _catService = catService;
     }
 
     // GET: api/cats/5
@@ -96,21 +89,16 @@ public class CatsController : ControllerBase
     public async Task<IActionResult> FetchCatEntities()
     {
         const int numberOfCatsToFetch = 25;
-        var response = await _httpClient.GetAsync($"{CatApiBaseUrl}images/search?limit={numberOfCatsToFetch}");
-
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            return StatusCode((int)response.StatusCode, "Failed to fetch data from TheCatAPI.");
+            var cats = await _catService.FetchCats(numberOfCatsToFetch);
+
+            // Return the deserialized object (JSON) to the client
+            return Ok(cats);
         }
-
-        // Deserialize the JSON response into the model
-        var content = await response.Content.ReadAsStringAsync();
-        var cats = JsonConvert.DeserializeObject<List<Models.External.CatEntity>>(content);
-
-        //_context.Cats.Add(catEntity);
-
-        // Return the deserialized object (JSON) to the client
-        return Ok(cats);
+        catch (HttpStatusException exc) {
+            return StatusCode((int)exc.StatusCode, "Failed to fetch data from TheCatAPI.");
+        }
 
         // return Ok($"{numberOfCatsToFetch} new cat images added.");
     }
