@@ -10,7 +10,7 @@ public class StealAlltheCatsDbContext : DbContext
     }
 
     public DbSet<CatEntity> Cats { get; set; } = null!;
-    public DbSet<CatEntity> Tags { get; set; } = null!;
+    public DbSet<TagEntity> Tags { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder) 
     {
         modelBuilder.Entity<CatEntity>()

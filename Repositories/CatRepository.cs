@@ -4,21 +4,21 @@ using StealAllTheCatsAPI.Models;
 namespace StealAllTheCatsAPI.Repositories;
 public class CatRepository : ICatRepository
 {
-    private readonly StealAlltheCatsDbContext stealAlltheCatsDbContext;
+    private readonly StealAlltheCatsDbContext _context;
 
     public CatRepository(StealAlltheCatsDbContext stealAlltheCatsDbContext) 
     {
-        this.stealAlltheCatsDbContext = stealAlltheCatsDbContext;
+        this._context = stealAlltheCatsDbContext;
     }
 
     public async Task<CatEntity?> GetCat(int id)
     {
-        return await stealAlltheCatsDbContext.Cats.FindAsync(id);
+        return await _context.Cats.FindAsync(id);
     }
      
     public async Task<IEnumerable<CatEntity>> GetCats(int offset, int numCats)
     {
-        return await stealAlltheCatsDbContext.Cats
+        return await _context.Cats
             .Skip(offset)
             .Take(numCats)
             .ToListAsync();
@@ -26,7 +26,7 @@ public class CatRepository : ICatRepository
 
     public async Task<IEnumerable<CatEntity>> GetCatsByTag(string tagName, int offset, int numCats)
     {
-        return await stealAlltheCatsDbContext.Cats
+        return await _context.Cats
             .Where(cat => cat.Tags.Any(t => t.Name == tagName))
             .Skip(offset)
             .Take(numCats)
@@ -35,19 +35,19 @@ public class CatRepository : ICatRepository
 
     public async Task<CatEntity> AddCat(CatEntity cat)
     {
-        var result = stealAlltheCatsDbContext.Cats.Add(cat);
-        await stealAlltheCatsDbContext.SaveChangesAsync();
+        var result = _context.Cats.Add(cat);
+        await _context.SaveChangesAsync();
         return result.Entity;
     }
 
     public async Task<CatEntity?> UpdateCat(CatEntity cat)
     {
         int id = cat.Id;
-        stealAlltheCatsDbContext.Entry(cat).State = EntityState.Modified;
+        _context.Entry(cat).State = EntityState.Modified;
 
         try
         {
-            await stealAlltheCatsDbContext.SaveChangesAsync();
+            await _context.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -65,11 +65,11 @@ public class CatRepository : ICatRepository
 
     public async Task<CatEntity?> DeleteCat(int id)
     {
-        var catEntity = await stealAlltheCatsDbContext.Cats.FindAsync(id);
+        var catEntity = await _context.Cats.FindAsync(id);
         if (catEntity != null)
         {
-            stealAlltheCatsDbContext.Cats.Remove(catEntity);
-            await stealAlltheCatsDbContext.SaveChangesAsync();
+            _context.Cats.Remove(catEntity);
+            await _context.SaveChangesAsync();
         }
 
         return catEntity;
@@ -77,6 +77,6 @@ public class CatRepository : ICatRepository
 
     private bool CatEntityExists(int id)
     {
-        return stealAlltheCatsDbContext.Cats.Any(e => e.Id == id);
+        return _context.Cats.Any(e => e.Id == id);
     }
 }
