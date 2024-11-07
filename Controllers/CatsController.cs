@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StealAllTheCatsAPI.Models;
-using StealAllTheCatsAPI.Repositories;
 using StealAllTheCatsAPI.Services;
 
 namespace StealAllTheCatsAPI.Controllers;
@@ -9,20 +8,18 @@ namespace StealAllTheCatsAPI.Controllers;
 [ApiController]
 public class CatsController : ControllerBase
 {
-    private readonly ICatRepository _catRepository;
-    private readonly ICatService _catService;
+    private readonly IStealAllTheCatsService _stealAllTheCatsService;
 
-    public CatsController(ICatService catService, ICatRepository catRepository)
+    public CatsController(IStealAllTheCatsService stealAllTheCatsService)
     {
-        _catRepository = catRepository;
-        _catService = catService;
+        _stealAllTheCatsService = stealAllTheCatsService;
     }
 
     // GET: api/cats/5
     [HttpGet("{id}")]
     public async Task<ActionResult<CatEntity>> GetCatEntity(int id)
     {
-        var catEntity = await _catRepository.GetCat(id);
+        var catEntity = await _stealAllTheCatsService.GetCat(id);
 
         if (catEntity == null)
         {
@@ -38,21 +35,10 @@ public class CatsController : ControllerBase
         [FromQuery] PaginationParameters pagination,
         [FromQuery] string? tag = null)
     {
-        int offset = (pagination.Page - 1) * pagination.PageSize;
-        int numCats = pagination.PageSize;
+        var cats = await _stealAllTheCatsService.GetPagedCats(
+            pagination.Page, pagination.PageSize, tag);
 
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        if (string.IsNullOrEmpty(tag))
-        {
-            var cats = await _catRepository.GetCats(offset, numCats);
-            return Ok(cats);
-        }
-
-        return Ok(await _catRepository.GetCatsByTag(tag, offset, numCats));
+        return Ok(cats);
     }
 
     // PUT: api/cats/5
@@ -65,7 +51,7 @@ public class CatsController : ControllerBase
             return BadRequest();
         }
 
-        var cat = await _catRepository.UpdateCat(catEntity);
+        var cat = await _stealAllTheCatsService.UpdateCat(catEntity);
 
         if (cat == null)
         {
@@ -79,7 +65,7 @@ public class CatsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<CatEntity>> PostCatEntity(CatEntity catEntity)
     {
-        var cat = await _catRepository.AddCat(catEntity);
+        var cat = await _stealAllTheCatsService.AddCat(catEntity);
     
         return CreatedAtAction("GetCatEntity", new { id = cat.Id }, cat);
     }
@@ -88,18 +74,18 @@ public class CatsController : ControllerBase
     [HttpPost("fetch")]
     public async Task<IActionResult> FetchCatEntities()
     {
-        const int numberOfCatsToFetch = 25;
         try
         {
-            var cats = await _catService.FetchCats(numberOfCatsToFetch);
+            const int numberOfCatsToFetch = 25;
+            var cats = await _stealAllTheCatsService.FetchCats(numberOfCatsToFetch);
 
             // Return the deserialized object (JSON) to the client
             return Ok(cats);
         }
-        catch (HttpStatusException exc) {
+        catch (HttpStatusException exc)
+        {
             return StatusCode((int)exc.StatusCode, "Failed to fetch data from TheCatAPI.");
         }
-
         // return Ok($"{numberOfCatsToFetch} new cat images added.");
     }
 
@@ -107,7 +93,7 @@ public class CatsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteCatEntity(int id)
     {
-        var catEntity = await _catRepository.DeleteCat(id);
+        var catEntity = await _stealAllTheCatsService.DeleteCat(id);
         if (catEntity == null)
         {
             return NotFound();
